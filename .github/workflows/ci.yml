@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.8", "3.10", "3.12", "3.13"]
+        exclude:
+          # macos-latest runners are arm64; no CPython 3.8 builds exist for them
+          - os: macos-latest
+            python-version: "3.8"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run tests
+        run: python -m unittest discover tests -v
+
+  lint-hygiene:
+    name: lint-hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Scan for hidden/bidi Unicode characters
+        run: |
+          python - <<'PYEOF'
+          import pathlib, sys, unicodedata
+          ALLOWED = {"\u200d"}  # zero-width joiner (emoji sequences)
+          bad = []
+          for path in sorted(pathlib.Path(".").rglob("*")):
+              if path.suffix not in (".md", ".py") or not path.is_file():
+                  continue
+              if ".git" in path.parts:
+                  continue
+              text = path.read_text(encoding="utf-8", errors="replace")
+              for lineno, line in enumerate(text.splitlines(), 1):
+                  for col, ch in enumerate(line, 1):
+                      if ch in ALLOWED:
+                          continue
+                      if unicodedata.category(ch) in ("Cf", "Co"):
+                          bad.append(f"{path}:{lineno}:{col}: U+{ord(ch):04X} ({unicodedata.name(ch, 'UNNAMED')})")
+          if bad:
+              print("Hidden/bidi Unicode characters found:")
+              print("\n".join(bad))
+              sys.exit(1)
+          print("No hidden/bidi Unicode characters found.")
+          PYEOF
+      - name: Assert engine uses no forbidden APIs (AST scan)
+        run: |
+          # An AST walk proves absence of dangerous *usage* without matching
+          # the prose in comments or docstrings (a plain grep would flag the
+          # engine's own "no subprocess/urllib/socket" security notes).
+          python - <<'PYEOF'
+          import ast, sys
+          ENGINE = "skills/skill-manager/scripts/skillmgr.py"
+          BANNED_MODULES = {"subprocess", "urllib", "socket", "requests",
+                            "ctypes", "pickle", "marshal", "http", "ftplib"}
+          BANNED_CALLS = {"eval", "exec", "compile", "__import__"}
+          tree = ast.parse(open(ENGINE, encoding="utf-8").read(), ENGINE)
+          bad = []
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  for a in node.names:
+                      if a.name.split(".")[0] in BANNED_MODULES:
+                          bad.append(f"line {node.lineno}: import {a.name}")
+              elif isinstance(node, ast.ImportFrom):
+                  if (node.module or "").split(".")[0] in BANNED_MODULES:
+                      bad.append(f"line {node.lineno}: from {node.module} import ...")
+              elif isinstance(node, ast.Call):
+                  f = node.func
+                  if isinstance(f, ast.Name) and f.id in BANNED_CALLS:
+                      bad.append(f"line {node.lineno}: {f.id}(...)")
+                  if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) \
+                          and f.value.id == "os" and f.attr in ("system", "popen"):
+                      bad.append(f"line {node.lineno}: os.{f.attr}(...)")
+          if bad:
+              print("Forbidden API usage found:")
+              print("\n".join(bad))
+              sys.exit(1)
+          print("Engine is clean: no forbidden API usage.")
+          PYEOF

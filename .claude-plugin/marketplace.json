@@ -1,0 +1,26 @@
+{
+  "name": "skill-manager",
+  "owner": {
+    "name": "OWNER"
+  },
+  "plugins": [
+    {
+      "name": "skill-manager",
+      "source": "./",
+      "description": "Three-tier activation manager for agent assets (skills, subagents, commands, workflows): keep a large library dormant at zero context cost and activate only what each project needs, via a symlink/junction/tracked-copy ladder with drift detection and repair.",
+      "version": "1.0.0",
+      "category": "productivity",
+      "keywords": [
+        "skills",
+        "skill-management",
+        "context",
+        "activation",
+        "agents",
+        "commands",
+        "workflows",
+        "library",
+        "symlink"
+      ]
+    }
+  ]
+}
