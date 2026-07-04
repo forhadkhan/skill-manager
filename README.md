@@ -15,7 +15,7 @@ Every skill and subagent you install globally adds its name and description to t
 
 ```bash
 # 1. Install (see other channels below)
-git clone https://github.com/OWNER/skill-manager
+git clone https://github.com/forhadkhan/skill-manager
 mkdir -p ~/.claude/skills
 ln -s "$PWD/skill-manager/skills/skill-manager" ~/.claude/skills/skill-manager
 
@@ -33,12 +33,11 @@ New sessions in that project now see only the assets you activated; everything e
 
 ## Installation
 
-Replace `OWNER` with the repository owner's GitHub handle.
 
 **1. Git clone (copy or symlink)**
 
 ```bash
-git clone https://github.com/OWNER/skill-manager
+git clone https://github.com/forhadkhan/skill-manager
 mkdir -p ~/.claude/skills
 # symlink (updates with git pull):
 ln -s "$PWD/skill-manager/skills/skill-manager" ~/.claude/skills/skill-manager
@@ -49,14 +48,14 @@ cp -r skill-manager/skills/skill-manager ~/.claude/skills/
 **2. Claude Code plugin**
 
 ```
-/plugin marketplace add OWNER/skill-manager
+/plugin marketplace add forhadkhan/skill-manager
 /plugin install skill-manager
 ```
 
 **3. skills CLI**
 
 ```bash
-npx skills add OWNER/skill-manager
+npx skills add forhadkhan/skill-manager
 ```
 
 ## The three-tier model

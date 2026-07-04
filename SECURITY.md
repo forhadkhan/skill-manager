@@ -15,7 +15,7 @@ audited: every one of them can be diffed against the code.
 
 Please report vulnerabilities **privately** via GitHub Security Advisories:
 
-> https://github.com/OWNER/skill-manager/security/advisories/new
+> https://github.com/forhadkhan/skill-manager/security/advisories/new
 
 - Do not open public issues for security reports.
 - We follow **90-day coordinated disclosure**: we aim to acknowledge within a

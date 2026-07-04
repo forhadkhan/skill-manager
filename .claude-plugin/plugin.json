@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Three-tier activation manager for agent assets (skills, subagents, commands, workflows): keep a large library dormant at zero context cost and activate only what each project needs, via a symlink/junction/tracked-copy ladder with drift detection and repair.",
   "author": {
-    "name": "OWNER"
+    "name": "Forhad Khan"
   },
   "license": "MIT",
   "keywords": [
