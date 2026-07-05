@@ -1,7 +1,9 @@
 # skill-manager
 
-<!-- badges -->
-[![CI](#)](#) [![License: MIT](#)](#) [![Python 3.8+](#)](#) [![Zero dependencies](#)](#)
+[![CI](https://github.com/forhadkhan/skill-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/forhadkhan/skill-manager/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![Zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](skills/skill-manager/scripts/skillmgr.py)
 
 **skill-manager** is a Claude Code skill plus a standard-library-only Python engine that gives agent assets — skills, subagents, commands, and workflows — three-tier activation: a dormant **library** (`~/.agents/library/`, zero context cost), an always-on **global** tier (`~/.claude/`), and a per-project tier (`<project>/.claude/`). You keep as many assets as you like in the library and activate only the ones each project actually needs, either conversationally ("set up skills for this project") or through an 11-command CLI.
 
