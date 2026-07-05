@@ -8,9 +8,9 @@ using a three-tier model:
   global    ~/.claude/<kind>/<name>            active in every session
   project   <project>/.claude/<kind>/<name>    active only in that project
 
-Activation is presence: a symlink (preferred), a directory junction (Windows
-fallback, directories only), or a tracked copy (universal fallback, recorded in a
-per-tier manifest with a content hash so drift can be detected and synced).
+Activation is presence: a symlink (preferred) or, where symlinks are unavailable
+(e.g. Windows without Developer Mode), a tracked copy recorded in a per-tier
+manifest with a content hash so drift can be detected and synced.
 
 SECURITY MODEL (invariants auditors can verify):
   * No network access of any kind (no urllib/socket/requests).
@@ -248,9 +248,39 @@ def one_hop_target(link: Path) -> "Path | None":
         return None
 
 
+def _same_dir(a: Path, b: Path) -> bool:
+    """Case- and shortname-robust directory identity.
+
+    Raw string comparison breaks on Windows: the same directory can surface as
+    `C:\\Users\\RUNNER~1\\...` (8.3 short name) or its long form, and paths are
+    case-insensitive. normcase(realpath(...)) collapses both. realpath is safe
+    here because we only ever compare *directory containers* (a link's target
+    parent vs. the library root), never the possibly-symlinked entry itself."""
+    try:
+        return os.path.normcase(os.path.realpath(str(a))) == \
+            os.path.normcase(os.path.realpath(str(b)))
+    except OSError:
+        return False
+
+
 def is_managed_link(entry: Path, kind: Kind) -> bool:
     target = one_hop_target(entry)
-    return target is not None and target.parent == Path(os.path.normpath(str(kind.lib_dir())))
+    return target is not None and _same_dir(target.parent, kind.lib_dir())
+
+
+def remove_activation(path: Path) -> None:
+    """Remove a tier activation (link or tracked copy) without ever deleting
+    through it. A directory symlink needs `rmdir` on Windows (not `unlink`);
+    only a real directory is tree-removed."""
+    if path.is_symlink():
+        try:
+            path.unlink()
+        except (OSError, ValueError):
+            os.rmdir(str(path))  # Windows directory symlink
+    elif path.is_dir():
+        shutil.rmtree(str(path))
+    else:
+        path.unlink()
 
 
 def _hash_file_into(h, path: Path) -> None:
@@ -333,7 +363,7 @@ class Lock:
 
 
 # ---------------------------------------------------------------------------
-# Manifest (tracked copies / junctions per tier directory)
+# Manifest (tracked copies per tier directory)
 # ---------------------------------------------------------------------------
 
 
@@ -527,7 +557,7 @@ def index_is_stale(index: dict) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Link / copy / junction creation
+# Link / copy creation
 # ---------------------------------------------------------------------------
 
 
@@ -540,18 +570,6 @@ def _try_symlink(src: Path, dest: Path, tier: str) -> "str | None":
         os.symlink(target, str(dest), target_is_directory=src.is_dir())
         return "symlink"
     except (OSError, NotImplementedError):
-        return None
-
-
-def _try_junction(src: Path, dest: Path) -> "str | None":
-    if os.name != "nt" or not src.is_dir():
-        return None
-    try:
-        import _winapi  # Windows-only stdlib module
-
-        _winapi.CreateJunction(str(src), str(dest))  # type: ignore[attr-defined]
-        return "junction"
-    except (ImportError, AttributeError, OSError):
         return None
 
 
@@ -708,16 +726,16 @@ def classify_entry(entry: Path, kind: Kind, manifest: dict) -> dict:
             return base
         base.update(state="foreign-link")
         return base
-    if m and m.get("mode") in ("copy", "junction"):
+    if m and m.get("mode") == "copy":
         state = "copied"
         lib_entry = kind.lib_dir() / entry.name  # manifest keys are full filenames
-        if m.get("mode") == "copy" and m.get("hash") and sha256_of(entry) != m["hash"]:
+        if m.get("hash") and sha256_of(entry) != m["hash"]:
             state = "copied-modified"  # local edits trump library drift
         elif not lib_entry.exists():
             state = "copied-orphan"
         elif m.get("hash") and sha256_of(lib_entry) != m["hash"]:
             state = "copied-drifted"
-        base.update(state=state, mode=m.get("mode", "copy"))
+        base.update(state=state, mode="copy")
         return base
     base.update(state="unmanaged", adoptable=kind.is_valid_entry(entry))
     return base
@@ -853,11 +871,7 @@ def _activate(kind: Kind, name: str, tier: str, project: "Path | None", args) ->
     tier_root.mkdir(parents=True, exist_ok=True)
     mode = None
     if not args.copy:
-        mode = _try_symlink(src, dest, tier) or _try_junction(src, dest)
-    if mode == "junction":
-        manifest = load_manifest(tier_root)
-        manifest["entries"][dest.name] = {"kind": kind.name, "mode": "junction"}
-        save_manifest(tier_root, manifest)
+        mode = _try_symlink(src, dest, tier)
     if mode is None:
         _copy_entry(src, dest)
         mode = "copy"
@@ -916,7 +930,7 @@ def _deactivate(kind: Kind, name: str, tier: str, project: "Path | None", args) 
                 EXIT_CONFLICT,
             )
         if not args.dry_run:
-            dest.unlink()
+            remove_activation(dest)
     elif dest.name in manifest["entries"]:
         entry = manifest["entries"][dest.name]
         if entry.get("mode") == "copy" and entry.get("hash"):
@@ -929,10 +943,7 @@ def _deactivate(kind: Kind, name: str, tier: str, project: "Path | None", args) 
                     EXIT_CONFLICT,
                 )
         if not args.dry_run:
-            if dest.is_dir() and not dest.is_symlink():
-                shutil.rmtree(str(dest))
-            else:
-                dest.unlink()
+            remove_activation(dest)
             del manifest["entries"][dest.name]
             save_manifest(tier_root, manifest)
     else:
@@ -1019,7 +1030,7 @@ def _adopt_one(kind: Kind, name: str, tier: str, project: "Path | None", args) -
             shutil.rmtree(str(src))
         else:
             src.unlink()
-        mode = _try_symlink(lib_dest, src, tier) or _try_junction(lib_dest, src)
+        mode = _try_symlink(lib_dest, src, tier)
         if mode is None:
             _copy_entry(lib_dest, src)
             manifest = load_manifest(tier_root)
@@ -1126,10 +1137,8 @@ def cmd_sync(args) -> int:
                 skipped.append({"name": entry_name, "reason": "local modifications (--force to overwrite)"})
                 continue
             if not args.dry_run:
-                if dest.is_dir() and not dest.is_symlink():
-                    shutil.rmtree(str(dest))
-                elif dest.exists():
-                    dest.unlink()
+                if dest.exists() or dest.is_symlink():
+                    remove_activation(dest)
                 _copy_entry(lib_entry, dest)
                 meta["hash"] = lib_hash
                 meta["copied_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -1232,10 +1241,7 @@ def cmd_uninstall(args) -> int:
                         info["state"].startswith("copied") and p.name in manifest["entries"]
                     ):
                         if not args.dry_run:
-                            if p.is_dir() and not p.is_symlink():
-                                shutil.rmtree(str(p))
-                            else:
-                                p.unlink()
+                            remove_activation(p)
                             manifest["entries"].pop(p.name, None)
                         removed.append({"kind": kname, "tier": tier_label, "entry": p.name})
                 if not args.dry_run:

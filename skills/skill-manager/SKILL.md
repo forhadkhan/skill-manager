@@ -33,7 +33,7 @@ only where it's useful.
 | **Project** (scoped) | `<project>/.claude/<kind>/` | that project's sessions | Whatever the project's stack needs |
 
 Kinds: `skills` (directories), `agents`, `commands`, `workflows` (single files).
-Activation = presence: a symlink where possible, a Windows junction, or a tracked
+Activation = presence: a symlink where possible, or a tracked
 copy (hash-recorded in a manifest, so drift is detectable and `sync`-able).
 
 The library deliberately lives at `~/.agents/library/`, **not** `~/.agents/skills/`
@@ -55,7 +55,7 @@ python3 <skill-dir>/scripts/skillmgr.py <command> [--kind skills|agents|commands
 | `index` / `index --check` | rebuild the library index / report staleness |
 | `status [--kind all] [--project DIR]` | every asset's tier + problems needing attention |
 | `detect [--project DIR]` | stack signals: manifests, languages, deps, infra, git-ness |
-| `link NAME... --tier global\|project [--copy]` | activate (symlink → junction → tracked copy) |
+| `link NAME... --tier global\|project [--copy]` | activate (symlink, else tracked copy) |
 | `unlink NAME... --tier ... [--force]` | deactivate; refuses foreign/modified content without --force |
 | `adopt NAME... --tier ... [--relink] [--force]` | move real content into the library, transactionally (batch OK; `--relink` keeps it active, plain adopt = adopt + demote in one step; refuses to drop embedded symlinks without --force) |
 | `import SRC [--name N] [--kind ...]` | copy an external asset in (single files need a file kind; embedded symlinks are stripped) |
@@ -145,7 +145,7 @@ individual pieces only when the license permits.
 ## Platform notes
 
 Windows without Developer Mode can't create symlinks — the engine silently falls
-back to junctions (directories) then tracked copies; nothing for you to do, but
-mention `sync` for copy freshness. Filesystem assets only load in Claude Code
+back to tracked copies; nothing for you to do, but mention `sync` for copy
+freshness after library updates. Filesystem assets only load in Claude Code
 CLI/desktop/IDE surfaces, not claude.ai web or mobile. Deeper facts:
 `references/mechanisms.md`.

@@ -83,7 +83,7 @@ are themselves symlinks, and hashing (`sha256_of`) ignores symlinked members.
 
 ### Drift in copy mode
 
-Where symlinks/junctions are unavailable, activation falls back to a tracked
+Where symlinks are unavailable, activation falls back to a tracked
 copy recorded in a per-tier manifest (`.skillmgr-manifest.json`) with a
 **sha256 content hash**. `status` detects drift (a copy that no longer matches
 its library entry), and `sync` refreshes it; `unlink` refuses to discard
@@ -119,8 +119,7 @@ one:
 2. **No process execution or dynamic code.** No `subprocess`, `os.system`,
    `os.popen`, `eval`, `exec`, `compile`, `__import__`, `pickle`, `marshal`, or
    `ctypes`. Verified by the CI AST scan's `BANNED_MODULES` / `BANNED_CALLS`
-   checks. The sole lazy import, `_winapi` (Windows junctions), is guarded by
-   `os.name == "nt"` and never runs on POSIX.
+   checks. There are no lazy or conditional imports.
 3. **Environment access limited to `SKILLMGR_*`.** The only environment
    variables read via `os.environ` are `SKILLMGR_CONFIG`,
    `SKILLMGR_LIBRARY_ROOT`, and `SKILLMGR_CLAUDE_HOME` (all through

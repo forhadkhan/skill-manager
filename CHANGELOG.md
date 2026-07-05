@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Three-tier activation model (library / global / project) for four asset
   kinds: skills, agents, commands, and workflows.
-- Activation ladder: symlink where possible, Windows junction for skill
-  directories, tracked copy (hash-recorded in a manifest) as the fallback.
+- Activation strategy: symlink where possible, otherwise a tracked copy
+  (hash-recorded in a manifest) as a universal, cross-platform fallback.
 - Drift detection and `sync` repair for tracked copies that have diverged
   from their library source.
 - `doctor` command that diagnoses (and with `--fix` repairs) dangling links,

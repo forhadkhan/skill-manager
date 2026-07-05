@@ -27,6 +27,21 @@ _spec.loader.exec_module(skillmgr)
 ENV_KEYS = ("SKILLMGR_LIBRARY_ROOT", "SKILLMGR_CLAUDE_HOME", "SKILLMGR_CONFIG")
 
 
+def _detect_case_sensitive_fs():
+    """True on case-sensitive filesystems (typical Linux); False on macOS/Windows
+    defaults. Some tests construct two entries differing only in case, which is
+    impossible where the filesystem folds case."""
+    d = tempfile.mkdtemp(prefix="skillmgr-fscase-")
+    try:
+        open(os.path.join(d, "casEprobe"), "w").close()
+        return not os.path.exists(os.path.join(d, "caseprobe"))
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+FS_CASE_SENSITIVE = _detect_case_sensitive_fs()
+
+
 class Base(unittest.TestCase):
     """Sandboxed environment + CLI helpers shared by all test classes."""
 
@@ -288,6 +303,9 @@ class TestLink(Base):
         self.assertEqual(code, 0)
         self.assertEqual(data["results"][0]["mode"], "existing-copy")
 
+    @unittest.skipUnless(FS_CASE_SENSITIVE,
+                         "two library entries differing only in case cannot coexist on a "
+                         "case-insensitive filesystem (macOS/Windows)")
     def test_link_case_insensitive_collision(self):
         self.make_skill("Alpha")
         self.make_skill("alpha")

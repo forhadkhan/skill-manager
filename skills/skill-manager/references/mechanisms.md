@@ -54,10 +54,15 @@ license, metadata) for cross-agent portability.
 ## Windows
 
 Symlink creation needs Administrator or Developer Mode (WinError 1314 otherwise).
-The engine's ladder: symlink → directory junction (`_winapi.CreateJunction`, no
-elevation, dirs only, same volume) → tracked copy with content hash. Ecosystem
-tools behave the same way (vercel CLI records `symlinkFailed: true` and copies).
-Copies drift when the library updates — that's what the manifest + `sync` exist for.
+The engine falls back symlink → tracked copy with a content hash. Directory
+junctions were considered and deliberately rejected: removing an activation must
+never risk the library, and a junction is a reparse point that `shutil.rmtree`
+would recurse *through* into the library on some Python/Windows combinations —
+a data-loss hazard that is hard to test portably. A tracked copy has no such
+risk. Ecosystem tools behave similarly (the vercel CLI records `symlinkFailed:
+true` and copies). Copies drift when the library updates — that's what the
+manifest + `sync` exist for. Removal is always symlink-safe: a directory symlink
+is unlinked/`rmdir`-ed (never tree-walked), and only a real copy is tree-removed.
 
 ## Plugin packs (marketplace installs)
 

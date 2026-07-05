@@ -95,7 +95,7 @@ python3 scripts/skillmgr.py <command> [--kind skills|agents|commands|workflows] 
 | `index [--check]` | rebuild the library index, or report staleness without writing |
 | `status [--kind all] [--project DIR]` | show every asset's tier and problems needing attention |
 | `detect [--project DIR]` | dump a project's stack signals (manifests, languages, deps, infra, git-ness) |
-| `link NAME... --tier global\|project [--copy]` | activate assets (symlink → junction → tracked copy) |
+| `link NAME... --tier global\|project [--copy]` | activate assets (symlink, else tracked copy) |
 | `unlink NAME... --tier ... [--force]` | deactivate; refuses foreign or modified content without `--force` |
 | `adopt NAME --tier ... [--relink]` | move real tier content into the library, transactionally |
 | `import SRC [--name N]` | copy an external asset into the library (strips embedded symlinks) |
@@ -105,15 +105,9 @@ python3 scripts/skillmgr.py <command> [--kind skills|agents|commands|workflows] 
 
 Every mutating command supports `--dry-run`.
 
-### Link strategy ladder
+### Link strategy
 
-Activation tries, in order:
-
-1. **Symlink** — preferred everywhere it works.
-2. **Windows directory junction** — no elevation or Developer Mode required; directories only, same volume.
-3. **Tracked copy** — universal fallback, recorded in a per-tier manifest with a content hash so drift is detectable and repairable with `sync`.
-
-On Windows without Developer Mode, symlink creation fails (WinError 1314); the engine falls back automatically — nothing to configure. Run `sync` occasionally to refresh tracked copies after library updates.
+Activation prefers a **symlink**. Where symlinks are unavailable — most commonly Windows without Developer Mode, where symlink creation fails with WinError 1314 — it falls back to a **tracked copy**: a real copy recorded in a per-tier manifest with a content hash, so drift from the library is detectable and repairable with `sync`. The fallback is automatic; nothing to configure. Run `sync` occasionally to refresh tracked copies after library updates.
 
 ## Security posture
 
