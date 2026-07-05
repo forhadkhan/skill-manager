@@ -248,24 +248,27 @@ def one_hop_target(link: Path) -> "Path | None":
         return None
 
 
-def _same_dir(a: Path, b: Path) -> bool:
-    """Case- and shortname-robust directory identity.
+def is_managed_link(entry: Path, kind: Kind) -> bool:
+    """True iff `entry` is a symlink that resolves to this tool's same-name
+    library entry.
 
-    Raw string comparison breaks on Windows: the same directory can surface as
-    `C:\\Users\\RUNNER~1\\...` (8.3 short name) or its long form, and paths are
-    case-insensitive. normcase(realpath(...)) collapses both. realpath is safe
-    here because we only ever compare *directory containers* (a link's target
-    parent vs. the library root), never the possibly-symlinked entry itself."""
+    Identity is decided with os.path.samefile (device + inode / Windows file
+    index), not by comparing target path strings. String comparison is fragile
+    on Windows — the same location can surface as an 8.3 short name
+    (RUNNER~1), a `\\\\?\\`-prefixed extended path, or differing case — whereas
+    samefile compares the underlying file object directly. It also transparently
+    handles a library entry that is itself a symlink (both sides resolve to the
+    same final inode). A broken link (target missing) raises inside samefile and
+    is reported as unmanaged here; classify_entry routes it to `broken-link`
+    based on existence before this flag matters."""
+    if not entry.is_symlink():
+        return False
+    lib_entry = kind.lib_dir() / entry.name
     try:
-        return os.path.normcase(os.path.realpath(str(a))) == \
-            os.path.normcase(os.path.realpath(str(b)))
+        return entry.exists() and lib_entry.exists() and \
+            os.path.samefile(str(entry), str(lib_entry))
     except OSError:
         return False
-
-
-def is_managed_link(entry: Path, kind: Kind) -> bool:
-    target = one_hop_target(entry)
-    return target is not None and _same_dir(target.parent, kind.lib_dir())
 
 
 def remove_activation(path: Path) -> None:
